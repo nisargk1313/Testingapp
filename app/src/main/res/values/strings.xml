@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Testing</string>
+    <string name="action_settings">Settings</string>
+    <string name="section_format">Hello World from section: %1$d</string>
+    <string name="email_hint">xyz@abc.com</string>
+    <string name="password_hint">minimum 8 characters</string>
+    <string name="action_sign_in_short">Sign In</string>
+    <string name="name_hint">Enter your full name here</string>
+    <string name="mobile_hint">10 digit mobile number here</string>
+    <string name="stock_sales">Stock &amp; Sales</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="title_activity_attendance_tabbed">Testing</string>
+</resources>
