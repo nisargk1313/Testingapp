@@ -69,7 +69,6 @@ public class fragment_attendance_take extends android.support.v4.app.Fragment im
 
 
         return rootView;
-
     }
 
     public void onClick(View v) {
