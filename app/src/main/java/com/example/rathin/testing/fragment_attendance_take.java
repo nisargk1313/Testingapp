@@ -2,8 +2,11 @@ package com.example.rathin.testing;
 
 import android.app.Fragment;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.camera2.CameraAccessException;
 import android.net.Uri;
 import android.os.Environment;
@@ -12,6 +15,7 @@ import android.support.annotation.NonNull;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,21 +34,28 @@ import com.google.firebase.storage.UploadTask;
 import com.google.firebase.auth.FirebaseAuth;
 import com.squareup.picasso.Picasso;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
+import static android.app.Activity.RESULT_CANCELED;
 import static android.app.Activity.RESULT_OK;
+import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
+import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
 
 public class fragment_attendance_take extends android.support.v4.app.Fragment implements View.OnClickListener {
-
-
+    public String path = "sdcard/camera_app/";
+    public String filename = "cam_image.jpg";
+    private String selectedImagePath;
+    private static final String URI = "uri";
     private Button btCamera;
     private ImageView mImageView;
     Uri photoURI;
     private StorageReference storage;
-
+    static final int CAM_REQUEST = 1;
     private static final int CAMERA_REQUEST_CODE = 1;
 
 
@@ -62,73 +73,96 @@ public class fragment_attendance_take extends android.support.v4.app.Fragment im
     }
 
     public void onClick(View v) {
+        Intent camera_intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        File file = getFile();
+        //FileProvider.getUriForFile(getActivity(), getActivity().getApplicationContext().getPackageName() + ".provider", file);
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M){
+                camera_intent.putExtra(MediaStore.EXTRA_OUTPUT,FileProvider.getUriForFile(getActivity(), "com.example.rathin.testing.fileprovider", file));
+            } else{
+                camera_intent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(file));
+            }
 
-        if (v == btCamera) {
-            dispatchTakePictureIntent();
-
+            startActivityForResult(camera_intent, CAM_REQUEST);
+        } catch (Exception e) {
+            Toast.makeText(getActivity(), e.toString(), Toast.LENGTH_LONG).show();
         }
     }
 
-    String mCurrentPhotoPath;
-
-    private File createImageFile() throws IOException {
-// Create an image file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new     Date());
-        String imageFileName = "JPEG_" + timeStamp + "_";
-        File storageDir = getActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        File image = File.createTempFile(
-                imageFileName,  /* prefix */
-                ".jpg",         /* suffix */
-                storageDir      /* directory */
-        );
-        mCurrentPhotoPath = image.getAbsolutePath();
-        return image;
-    }
-
-    private void dispatchTakePictureIntent() {
-        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-// Ensure that there's a camera activity to handle the intent
-        if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
-            // Create the File where the photo should go
-            File photoFile = null;
-            try {
-                photoFile = createImageFile();
-            } catch (IOException ex) {
-                // Error occurred while creating the File...
-            }
-            // Continue only if the File was successfully created
-            if (photoFile != null) {
-                Uri photoURI = FileProvider.getUriForFile(getContext(),
-                        "com.example.android.fileprovider",
-                        photoFile);
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                startActivityForResult(takePictureIntent, CAMERA_REQUEST_CODE);
-            }
-        }
-    }
-
+    @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+        // if the result is capturing Image
+        Log.d(URI, "camera");
+        if (requestCode == CAMERA_REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                Log.d(URI, "camera1");
+                String path = selectedImagePath+"/" + filename;
+                Log.d(URI,path + " URI");
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                Bitmap bitmap = BitmapFactory.decodeFile(path, options);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+                byte[] bytedata = baos.toByteArray();
+                // Create a storage reference from our app
 
-        if(requestCode == CAMERA_REQUEST_CODE && resultCode == RESULT_OK){
-           // progressDialog.setMessage("Uploading...");
-           // progressDialog.show();
-            Uri uri = data.getData();
 
-            StorageReference filepath =     storage.child("Photos").child(uri.getLastPathSegment());
-            filepath.putFile(photoURI).addOnSuccessListener(new    OnSuccessListener<UploadTask.TaskSnapshot>() {
-                @Override
-                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                    Toast.makeText(getContext(), "Upload Successful!",    Toast.LENGTH_SHORT).show();
-                   // progressDialog.dismiss();
-                }
-            }).addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception e) {
-                   // Toast.makeText(MainActivity.this, "Upload Failed!", Toast.LENGTH_SHORT).show();
-                }
-            });
+// Create a reference to "mountains.jpg"
+                StorageReference mountainsRef = storage.child("mountains.jpg");
+                UploadTask uploadTask = mountainsRef.putBytes(bytedata);
+                uploadTask.addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        // Handle unsuccessful uploads
+                    }
+                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                        // taskSnapshot.getMetadata() contains file metadata such as size, content-type, and download URL.
+                        Uri downloadUrl = taskSnapshot.getDownloadUrl();
+                        Log.d(URI, "yeaaaaah!!! finally:P");
+                    }
+                });
+                // mImageView.setImageBitmap(bitmap);
+            } else if (resultCode == RESULT_CANCELED) {
+                Log.d(URI, "camera2");
+                // user cancelled Image capture
+                Toast.makeText(getActivity(),
+                        "User cancelled image capture", Toast.LENGTH_SHORT)
+                        .show();
+            } else {
+                Log.d(URI, "camera3");
+                // failed to capture image
+                Toast.makeText(getActivity(),
+                        "Sorry! Failed to capture image", Toast.LENGTH_SHORT)
+                        .show();
+            }
+        } else {
+            Log.d(URI, "camera4");
         }
     }
+
+    private File getFile() {
+        File imagePath;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M){
+             imagePath = new File(getActivity().getFilesDir(), "images");
+            if (!imagePath.exists()) {
+                imagePath.mkdir();
+            }
+            selectedImagePath=imagePath.getAbsolutePath();
+        } else{
+            imagePath = new File("sdcard/camera_app");
+            if (!imagePath.exists()) {
+                imagePath.mkdir();
+            }
+            selectedImagePath="sdcard/camera_app";
+        }
+        Long tsLong = System.currentTimeMillis() / 1000;
+        String ts = tsLong.toString();
+        File image_file = new File(imagePath, "cam_image.jpg" + ts);
+        filename = "cam_image.jpg" + ts;
+        return image_file;
+    }
+
 }
+
 
